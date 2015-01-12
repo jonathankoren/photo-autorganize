@@ -1,0 +1,183 @@
+#!/usr/bin/env python2.7
+
+# A simple script for organizing photos and videos based on date.
+
+# Copyright 2014 Jonathan Koren <jonathan@jonathankoren.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+
+
+# Config for creating destination subdirectories
+YYYY_MM_DD_FORMAT = 'yyyy-mm-dd';	# Picasa default
+#YYYY_MM_DD_FORMAT = 'yyyy/mm/dd';
+#YYYY_MM_DD_FORMAT = 'yyyy/MMM dd';
+
+########################################################
+#  There are no user servicable parts blow this line   #
+########################################################
+
+import os
+import sys
+from PIL import Image
+from PIL.ExifTags import TAGS
+import datetime
+import re
+import shutil
+import calendar
+
+# FIXME: This does not always do the best job organizing movies. It 
+#        should, based on their context by examing the filenames 
+#        if they're in a sequence, or if there is a corresponding 
+#        thumbnail image.
+#          Example 1: MVI_0123.AVI goes with IMG_0122.AVI
+#          Example 2: IMG_0240.MOV goes with IMG_0240.JPG
+
+def listFiles(dir):
+  '''Perform a depth first search of the specified 
+  directory and return a list of all files found.'''
+  l = list()
+  basedir = dir
+  subdirlist = []
+  for item in os.listdir(dir):
+    if os.path.isfile(os.path.join(basedir,item)):
+      l.append(os.path.join(basedir, item))
+    else:
+      subdirlist.append(os.path.join(basedir, item))
+  for subdir in subdirlist:
+    if subdir[0] != '.':
+      l = l + listFiles(subdir)
+  return l
+
+def getExifTag(img, tagName):
+  try :
+    for (k,v) in img._getexif().iteritems():
+      if TAGS.get(k) == tagName:
+        return v
+  except AttributeError:
+    return None
+
+def getSimpleFilename(filename):
+  return filename.split(os.path.sep)[-1]
+
+def getDateFromFilename(filename):
+  # don't worry about caching this, because re uses an LRU for us!
+  pathParts = filename.split(os.path.sep)
+
+  match = re.match('^([(0-9]{4})[-_.: ]?([0-9]{2})[-_.: ]?([0-9]{2})[-_.: ]?',\
+                   getSimpleFilename(filename))
+  if match != None:
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+  match = re.match('^([01][0-9])([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})-([0-9]+)',\
+                   getSimpleFilename(filename))
+  if match != None:
+    ye = int(match.group(1))
+    mo = int(match.group(2))
+    da = int(match.group(3))
+    hr = int(match.group(4))
+    mm = int(match.group(5))
+    if (0 <= ye) and (ye <= 20) and \
+       (1 <= mo) and (mo <= 12) and \
+       (1 <= da) and (da <= 31) and \
+       (0 <= hr) and (hr <= 23) and \
+       (0 <= mm) and (mm <= 59):
+      return (ye, mo, da)
+    else:
+      return None
+  else:
+    return None
+
+def getDate(filename):
+  '''Returns the date that the photo was taken on by
+  reading the associated EXIF data. If EXIF is not 
+  available, falls back to filename heuristics, and
+  then finally to file creation date.'''
+  SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv', 'wmf', 'jpg', 'jpeg', 'png', 'gif'])
+  if filename[filename.rindex(os.path.sep)+1] == '.':
+    return None
+  extension = filename[filename.rindex('.')+1:].lower()
+  if extension not in SUPPORTED_EXTENSIONS:
+    return None
+
+  try:
+    img = Image.open(filename)
+
+    dateTime = getExifTag(img, 'DateTimeOriginal')
+    if dateTime != None:
+      dts = dateTime[:dateTime.rindex(' ')].split(':')
+      return (int(dts[0]), int(dts[1]), int(dts[2]))
+
+    dateTime = getExifTag(img, 'DateTime')
+    if dateTime != None: 
+      dts = dateTime[:dateTime.rindex(' ')].split(':')
+      return (int(dts[0]), int(dts[1]), int(dts[2]))
+  except IOError:
+    pass
+
+  dateTime = getDateFromFilename(filename)
+  if dateTime != None:
+    return dateTime
+
+  # creation time is really stupid, you can't
+  # really trust the semantics of any of these, 
+  # except modification time, but c'est la vie
+  dt = datetime.datetime.fromtimestamp(os.path.getctime(filename))
+  return (dt.year, dt.month, dt.day)
+  
+def makeDestDirYMD(destDirName, ymd):
+  dest = destDirName + os.path.sep
+  if ((1900 <= ymd[0]) and (ymd[0] <= 2100) and \
+      (1 <= ymd[1]) and (ymd[1] <= 12) and \
+      (1 <= ymd[2]) and (ymd[2] <= 31)):
+    if YYYY_MM_DD_FORMAT == 'yyyy-mm-dd':
+      dir = dir + ('%d-%02d-%02d' % (ymd[0], ymd[1], ymd[2]))
+    elif YYYY_MM_DD_FORMAT == 'yyyy/mm/dd':
+      dir = dir  + ('%d' % ymd[0]) + os.path.sep + ('%02d' % ymd[1]) + os.path.sep + ('%02d' % ymd[2])
+    else:
+      dir = dir + ('%d' % ymd[0]) + os.path.sep + calendar.month_name[ymd[1]] + ' ' + str(ymd[2]) + ', ' + str(ymd[0])
+  else:
+    dir = dir + '_invalid_date_'
+  return dir
+
+########################################################
+
+if (len(sys.argv) != 3):
+  print 'usage: photo-autorganize <source> <dir>'
+  sys.exit()
+sourceDirname = sys.argv[1]
+destDirName   = sys.argv[2]
+
+for filename in listFiles(sourceDirname):
+  ymd = getDate(filename)
+  if ymd == None:
+    print 'INFO: skipping ' + filename
+    continue
+  destDirnameYMD = makeDestDirYMD(destDirName, ymd)
+  destFilename = destDirnameYMD + os.path.sep + getSimpleFilename(filename).lower()
+  try:
+    os.makedirs(destDirnameYMD)
+  except OSError:
+    pass
+  try:
+    os.stat(destFilename)
+    print 'WARN: refusing to copy ' + filename + ' to existing ' + destFilename
+  except OSError:
+    # good! stat failed
+    try: 
+      print 'INFO: copying ' + filename + ' to ' + destFilename
+      shutil.copy2(filename, destFilename)
+    except OSError as detail:
+      print 'ERROR: tried to copy ' + filename + ' to ' + destFilename + ' but failed. ' + str(detail)
