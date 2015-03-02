@@ -1,0 +1,20 @@
+#!/bin/sh
+
+curyear=`date | awk '{print $6}'`
+prevyear=`expr $curyear - 1`
+
+~/bin/wolcmd deadbeef 192.168.1.42 255.255.255.0 4343
+echo "waiting 300 seconds..."
+sleep 300
+
+curyeardirs=`/usr/bin/ssh openmediavault.local ls -d /media/TheRaidArray/Media/Photos/organized/$curyear-*`
+
+mkdir -p ~/Pictures/Photos/organized
+for d in $curyeardirs
+do
+	echo rsyncing $d...
+    dest=`basename $d`
+	/usr/bin/rsync --verbose --log-file=photo-rsync-$dest.log --exclude .AppleDouble --recursive --times openmediavault.local:$d ~/Pictures/Photos/organized
+done
+echo rsyncing /media/TheRaidArray/Media/Photos/organized/$prevyear
+/usr/bin/rsync --verbose --log-file=photo-rsync-$prevyear.log --exclude .AppleDouble --recursive --times openmediavault.local:/media/TheRaidArray/Media/Photos/organized/$prevyear ~/Pictures/Photos/organized
