@@ -143,14 +143,14 @@ def makeDestDirYMD(destDirName, ymd):
       (1 <= ymd[1]) and (ymd[1] <= 12) and \
       (1 <= ymd[2]) and (ymd[2] <= 31)):
     if YYYY_MM_DD_FORMAT == 'yyyy-mm-dd':
-      dir = dir + ('%d-%02d-%02d' % (ymd[0], ymd[1], ymd[2]))
+      dest = dest + ('%d-%02d-%02d' % (ymd[0], ymd[1], ymd[2]))
     elif YYYY_MM_DD_FORMAT == 'yyyy/mm/dd':
-      dir = dir  + ('%d' % ymd[0]) + os.path.sep + ('%02d' % ymd[1]) + os.path.sep + ('%02d' % ymd[2])
+      dest = dest + ('%d' % ymd[0]) + os.path.sep + ('%02d' % ymd[1]) + os.path.sep + ('%02d' % ymd[2])
     else:
-      dir = dir + ('%d' % ymd[0]) + os.path.sep + calendar.month_name[ymd[1]] + ' ' + str(ymd[2]) + ', ' + str(ymd[0])
+      dest = dest + ('%d' % ymd[0]) + os.path.sep + calendar.month_name[ymd[1]] + ' ' + str(ymd[2]) + ', ' + str(ymd[0])
   else:
-    dir = dir + '_invalid_date_'
-  return dir
+    dest = dest + '_invalid_date_'
+  return dest
 
 ########################################################
 
@@ -173,6 +173,8 @@ for filename in listFiles(sourceDirname):
     pass
   try:
     os.stat(destFilename)
+    # FIXME check the SHA1s on filename and destFilename. If they're the same
+    #       info a skip. If they're different, rename the destFilename and copy
     print 'WARN: refusing to copy ' + filename + ' to existing ' + destFilename
   except OSError:
     # good! stat failed
