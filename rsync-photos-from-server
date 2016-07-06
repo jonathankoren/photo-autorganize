@@ -9,7 +9,7 @@ prevyear=`expr $curyear - 1`
 
 curyeardirs=`/usr/bin/ssh openmediavault.local ls -d /media/TheRaidArray/Media/Photos/organized/$curyear-*`
 
-mkdir -p ~/Pictures/Photos/organized
+#mkdir -p ~/Pictures/Photos/organized
 for d in $curyeardirs
 do
 	echo rsyncing $d...

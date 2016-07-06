@@ -1,0 +1,3 @@
+#!/bin/sh
+
+/usr/bin/rsync --verbose --exclude .AppleDouble --recursive --times $1 openmediavault.local:/media/TheRaidArray/Media/Photos/organized
