@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+
+# A simple script for finding duplicate photos
+
+# Copyright 2016 Jonathan Koren <jonathan@jonathankoren.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+
+from PIL import Image
+import argparse
+import imagehash
+import os
+import sys
+
+def listFiles(dir):
+  '''Perform a depth first search of the specified
+  directory and return a list of all files found.'''
+  l = list()
+  basedir = dir
+  subdirlist = []
+  for item in os.listdir(dir):
+    if os.path.isfile(os.path.join(basedir,item)):
+      l.append(os.path.join(basedir, item))
+    else:
+      subdirlist.append(os.path.join(basedir, item))
+  for subdir in subdirlist:
+    if subdir[0] != '.':
+      l = l + listFiles(subdir)
+  return l
+
+###############################################################################
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--delete',
+                      help='Delete duplicates', action='store_true')
+  parser.add_argument('dirname', type=str,
+                      help='directory to process', action='store')
+  args = parser.parse_args()
+
+  phashes = {}
+  allfiles = listFiles(sys.argv[1])
+  line = 0
+  numFiles = len(allfiles)
+  sys.stderr.write("Processing ")
+  sys.stderr.flush()
+  for filename in allfiles:
+    line = line + 1
+    if line % int(numFiles / 20.0) == 0:
+      sys.stderr.write(".")
+      sys.stderr.flush()
+    try:
+      phash = imagehash.phash(Image.open(filename))
+      if phash in phashes:
+        print("DUPE " + phashes[phash] + " and " + filename)
+        if args.delete:
+          print("DELETING " + filename)
+          try:
+            os.unlink(filename)
+          except Exception as e:
+            print("ERROR can't unlink " + filename + ": " + str(e))
+      else:
+        phashes[phash] = filename
+    except OSError:
+      print("skipping " + filename)
+  sys.stderr.write("\n")
+  sys.stderr.flush()

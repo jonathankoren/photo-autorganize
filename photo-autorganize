@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 # A simple script for organizing photos and videos based on date.
 
@@ -38,15 +38,8 @@ import re
 import shutil
 import calendar
 
-# FIXME: This does not always do the best job organizing movies. It 
-#        should, based on their context by examing the filenames 
-#        if they're in a sequence, or if there is a corresponding 
-#        thumbnail image.
-#          Example 1: MVI_0123.AVI goes with IMG_0122.AVI
-#          Example 2: IMG_0240.MOV goes with IMG_0240.JPG
-
 def listFiles(dir):
-  '''Perform a depth first search of the specified 
+  '''Perform a depth first search of the specified
   directory and return a list of all files found.'''
   l = list()
   basedir = dir
@@ -63,7 +56,7 @@ def listFiles(dir):
 
 def getExifTag(img, tagName):
   try :
-    for (k,v) in img._getexif().iteritems():
+    for (k,v) in img._getexif().items():
       if TAGS.get(k) == tagName:
         return v
   except AttributeError:
@@ -102,7 +95,7 @@ def getDateFromFilename(filename):
 
 def getDate(filename):
   '''Returns the date that the photo was taken on by
-  reading the associated EXIF data. If EXIF is not 
+  reading the associated EXIF data. If EXIF is not
   available, falls back to filename heuristics, and
   then finally to file creation date.'''
   SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv', 'wmf', 'jpg', 'jpeg', 'png', 'gif'])
@@ -121,7 +114,7 @@ def getDate(filename):
       return (int(dts[0]), int(dts[1]), int(dts[2]))
 
     dateTime = getExifTag(img, 'DateTime')
-    if dateTime != None: 
+    if dateTime != None:
       dts = dateTime[:dateTime.rindex(' ')].split(':')
       return (int(dts[0]), int(dts[1]), int(dts[2]))
   except IOError:
@@ -132,11 +125,18 @@ def getDate(filename):
     return dateTime
 
   # creation time is really stupid, you can't
-  # really trust the semantics of any of these, 
+  # really trust the semantics of any of these,
   # except modification time, but c'est la vie
   dt = datetime.datetime.fromtimestamp(os.path.getctime(filename))
   return (dt.year, dt.month, dt.day)
-  
+
+# FIXME: This does not always do the best job organizing movies. It
+#        should, based on their context by examing the filenames
+#        if they're in a sequence, or if there is a corresponding
+#        thumbnail image.
+#          Example 1: MVI_0123.AVI goes with IMG_0122.AVI
+#          Example 2: IMG_0240.MOV goes with IMG_0240.JPG
+
 def makeDestDirYMD(destDirName, ymd):
   dest = destDirName + os.path.sep
   if ((1900 <= ymd[0]) and (ymd[0] <= 2100) and \
@@ -155,15 +155,15 @@ def makeDestDirYMD(destDirName, ymd):
 ########################################################
 
 if (len(sys.argv) != 3):
-  print 'usage: photo-autorganize <source> <dir>'
+  print('usage: photo-autorganize <source> <dir>')
   sys.exit()
+
 sourceDirname = sys.argv[1]
 destDirName   = sys.argv[2]
-
 for filename in listFiles(sourceDirname):
   ymd = getDate(filename)
   if ymd == None:
-    print 'INFO: skipping ' + filename
+    print('INFO: skipping ' + filename)
     continue
   destDirnameYMD = makeDestDirYMD(destDirName, ymd)
   destFilename = destDirnameYMD + os.path.sep + getSimpleFilename(filename).lower()
@@ -175,11 +175,11 @@ for filename in listFiles(sourceDirname):
     os.stat(destFilename)
     # FIXME check the SHA1s on filename and destFilename. If they're the same
     #       info a skip. If they're different, rename the destFilename and copy
-    print 'WARN: refusing to copy ' + filename + ' to existing ' + destFilename
+    print('WARN: refusing to copy ' + filename + ' to existing ' + destFilename)
   except OSError:
     # good! stat failed
-    try: 
-      print 'INFO: copying ' + filename + ' to ' + destFilename
+    try:
+      print('INFO: copying ' + filename + ' to ' + destFilename)
       shutil.copy2(filename, destFilename)
     except OSError as detail:
-      print 'ERROR: tried to copy ' + filename + ' to ' + destFilename + ' but failed. ' + str(detail)
+      print('ERROR: tried to copy ' + filename + ' to ' + destFilename + ' but failed. ' + str(detail))
