@@ -26,7 +26,7 @@ YYYY_MM_DD_FORMAT = 'yyyy-mm-dd';	# Picasa default
 #YYYY_MM_DD_FORMAT = 'yyyy/MMM dd';
 
 ########################################################
-#  There are no user servicable parts blow this line   #
+#  There are no user servicable parts below this line   #
 ########################################################
 
 import os
