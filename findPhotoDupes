@@ -73,6 +73,9 @@ def resolveDuplicate(left, right):
   indexToKeep = resolveWeirdFilenames(left, right)
   if indexToKeep > 0:
     return indexToKeep
+  indexToKeep = resolveSameNameDifferentDirs(left, right)
+  if indexToKeep > 0:
+    return indexToKeep
 
 def resolvePicasa(left, right):
   indexToKeep = 0
@@ -162,6 +165,25 @@ def resolveWeirdFilenames(left, right):
   else:
     return 0
 
+def resolveSameNameDifferentDirs(left, right):
+  leftdir = os.path.dirname(left)
+  leftbase = os.path.basename(left)
+  rightdir = os.path.dirname(right)
+  rightbase = os.path.basename(right)
+  if leftbase == rightbase and leftdir != rightdir:
+    leftMatch = re.search(os.path.sep + '([0-9]{4})-([0-9]{2})-([0-9]{2})' + os.path.sep, leftdir)
+    rightMatch = re.search(os.path.sep + '([0-9]{4})-([0-9]{2})-([0-9]{2})' + os.path.sep, rightdir)
+    if leftMatch is not None and rightMatch is not None:
+      leftymd = int(leftMatch.group(1) + leftMatch.group(2) + leftMatch.group(3))
+      rightymd = int(rightMatch.group(1) + rightMatch.group(2) + rightMatch.group(3))
+      if leftymd < rightymd:
+        deleteFile(right)
+        return 1
+      else:
+        deleteFile(left)
+        return 2
+  return 0
+
 def deleteFile(filename):
   print("DELETE " + filename)
   if DELETE:
@@ -184,7 +206,7 @@ if __name__ == '__main__':
   DELETE = args.delete
 
 
-  SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv', 'wmf', 'jpg', 'jpeg', 'png', 'gif'])
+  SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv', 'wmf', 'jpg', 'jpeg', 'png', 'gif', 'tif', 'tiff'])
   hashes = {}
   allfiles = listFiles(args.dirname)
   for filename in allfiles:
@@ -201,6 +223,7 @@ if __name__ == '__main__':
       continue
     if h1 in hashes:
       filename2 = hashes[h1]
+      # FIXME: fold this into resolveDuplicate()
       print("CHECKING " + filename2 + " and " + filename)
       ext1 = os.path.splitext(filename)[1].lower()
       ext2 = os.path.splitext(filename2)[1].lower()
