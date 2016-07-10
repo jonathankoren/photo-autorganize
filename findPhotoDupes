@@ -76,6 +76,7 @@ def resolveDuplicate(left, right):
   indexToKeep = resolveSameNameDifferentDirs(left, right)
   if indexToKeep > 0:
     return indexToKeep
+  return indexToKeep
 
 def resolvePicasa(left, right):
   indexToKeep = 0
