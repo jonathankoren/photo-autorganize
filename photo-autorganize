@@ -25,9 +25,9 @@ YYYY_MM_DD_FORMAT = 'yyyy-mm-dd';	# Picasa default
 #YYYY_MM_DD_FORMAT = 'yyyy/mm/dd';
 #YYYY_MM_DD_FORMAT = 'yyyy/MMM dd';
 
-########################################################
+#########################################################
 #  There are no user servicable parts below this line   #
-########################################################
+#########################################################
 
 import os
 import sys
@@ -66,9 +66,7 @@ def getSimpleFilename(filename):
   return filename.split(os.path.sep)[-1]
 
 def getDateFromFilename(filename):
-  # don't worry about caching this, because re uses an LRU for us!
   pathParts = filename.split(os.path.sep)
-
   match = re.match('^([(0-9]{4})[-_.: ]?([0-9]{2})[-_.: ]?([0-9]{2})[-_.: ]?',\
                    getSimpleFilename(filename))
   if match != None:
@@ -98,7 +96,8 @@ def getDate(filename):
   reading the associated EXIF data. If EXIF is not
   available, falls back to filename heuristics, and
   then finally to file creation date.'''
-  SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv', 'wmf', 'jpg', 'jpeg', 'png', 'gif'])
+  SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv',
+                              'wmf', 'jpg', 'jpeg', 'png', 'gif'])
   if filename[filename.rindex(os.path.sep)+1] == '.':
     return None
   extension = filename[filename.rindex('.')+1:].lower()
@@ -107,7 +106,6 @@ def getDate(filename):
 
   try:
     img = Image.open(filename)
-
     dateTime = getExifTag(img, 'DateTimeOriginal')
     if dateTime != None:
       dts = dateTime[:dateTime.rindex(' ')].split(':')
@@ -127,7 +125,12 @@ def getDate(filename):
   # creation time is really stupid, you can't
   # really trust the semantics of any of these,
   # except modification time, but c'est la vie
-  dt = datetime.datetime.fromtimestamp(os.path.getctime(filename))
+  ctime = os.path.getctime(filename)
+  mtime = os.path.getmtime(filename)
+  earliestTime = mtime
+  if ctime < mtime:
+    earliestTime = ctime
+  dt = datetime.datetime.fromtimestamp(earliestTime)
   return (dt.year, dt.month, dt.day)
 
 # FIXME: This does not always do the best job organizing movies. It
@@ -154,32 +157,33 @@ def makeDestDirYMD(destDirName, ymd):
 
 ########################################################
 
-if (len(sys.argv) != 3):
-  print('usage: photo-autorganize <source> <dir>')
-  sys.exit()
+if __name__ == '__main__':
+  if (len(sys.argv) != 3):
+    print('usage: photo-autorganize <source> <dir>')
+    sys.exit()
 
-sourceDirname = sys.argv[1]
-destDirName   = sys.argv[2]
-for filename in listFiles(sourceDirname):
-  ymd = getDate(filename)
-  if ymd == None:
-    print('INFO: skipping ' + filename)
-    continue
-  destDirnameYMD = makeDestDirYMD(destDirName, ymd)
-  destFilename = destDirnameYMD + os.path.sep + getSimpleFilename(filename).lower()
-  try:
-    os.makedirs(destDirnameYMD)
-  except OSError:
-    pass
-  try:
-    os.stat(destFilename)
-    # FIXME check the SHA1s on filename and destFilename. If they're the same
-    #       info a skip. If they're different, rename the destFilename and copy
-    print('WARN: refusing to copy ' + filename + ' to existing ' + destFilename)
-  except OSError:
-    # good! stat failed
+  sourceDirname = sys.argv[1]
+  destDirName   = sys.argv[2]
+  for filename in listFiles(sourceDirname):
+    ymd = getDate(filename)
+    if ymd == None:
+      print('INFO: skipping ' + filename)
+      continue
+    destDirnameYMD = makeDestDirYMD(destDirName, ymd)
+    destFilename = destDirnameYMD + os.path.sep + getSimpleFilename(filename).lower()
     try:
-      print('INFO: copying ' + filename + ' to ' + destFilename)
-      shutil.copy2(filename, destFilename)
-    except OSError as detail:
-      print('ERROR: tried to copy ' + filename + ' to ' + destFilename + ' but failed. ' + str(detail))
+      os.makedirs(destDirnameYMD)
+    except OSError:
+      pass
+    try:
+      os.stat(destFilename)
+      # FIXME check the SHA1s on filename and destFilename. If they're the same
+      #       info a skip. If they're different, rename the destFilename and copy
+      print('WARN: refusing to copy ' + filename + ' to existing ' + destFilename)
+    except OSError:
+      # good! stat failed
+      try:
+        print('INFO: copying ' + filename + ' to ' + destFilename)
+        shutil.copy2(filename, destFilename)
+      except OSError as detail:
+        print('ERROR: tried to copy ' + filename + ' to ' + destFilename + ' but failed. ' + str(detail))

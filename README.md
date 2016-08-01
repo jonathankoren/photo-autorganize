@@ -1,5 +1,4 @@
 #photo-autorganize
-
 A simple script for organizing photos and videos based on date.
 
 This script copies image and video files from one directory into another
