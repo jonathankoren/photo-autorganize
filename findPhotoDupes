@@ -28,6 +28,12 @@ import os.path
 import re
 import sys
 
+def listFilesInMultipleDirs(dirs):
+  l = list()
+  for dir in dirs:
+    l += listFiles(dir)
+  return l
+
 def listFiles(dir):
   '''Perform a depth first search of the specified
   directory and return a list of all files found.'''
@@ -38,11 +44,12 @@ def listFiles(dir):
     if os.path.isfile(os.path.join(basedir,item)):
       l.append(os.path.join(basedir, item))
     else:
-      subdirlist.append(os.path.join(basedir, item))
+      if item != '..' and  item != '.':
+        subdirlist.append(os.path.join(basedir, item))
   for subdir in subdirlist:
-    if subdir[0] != '.':
-      l = l + listFiles(subdir)
+    l = l + listFiles(subdir)
   return l
+
 
 def getHash(filename):
   try:
@@ -201,15 +208,14 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--delete',
                       help='Delete duplicates', action='store_true')
-  parser.add_argument('dirname', type=str,
-                      help='directory to process', action='store')
+  parser.add_argument('dirnames', type=str, nargs='+',
+                      help='directories to process', action='store')
   args = parser.parse_args()
   DELETE = args.delete
 
-
   SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv', 'wmf', 'jpg', 'jpeg', 'png', 'gif', 'tif', 'tiff'])
   hashes = {}
-  allfiles = listFiles(args.dirname)
+  allfiles = listFilesInMultipleDirs(args.dirnames)
   for filename in allfiles:
     dupe = False
     h1 = getHash(filename)
