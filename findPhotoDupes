@@ -241,7 +241,9 @@ if __name__ == '__main__':
         else:
           img1 = Image.open(filename)
           img2 = Image.open(filename2)
-          if img1.height == img2.height and img1.width == img2.width:
+          w1, h1 = img1.size
+          w2, h2 = img2.size
+          if w1 == w2 and h1 == h2:
             dupe = True
           img1.close()
           img2.close()
