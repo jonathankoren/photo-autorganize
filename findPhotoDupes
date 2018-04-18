@@ -19,253 +19,271 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 
-from PIL import Image
 import argparse
 import hashlib
 import imagehash
 import os
 import os.path
+from PIL import Image
 import re
 import sys
 
+
 def listFilesInMultipleDirs(dirs):
-  l = list()
-  for dir in dirs:
-    l += listFiles(dir)
-  return l
+    l = list()
+    for dir in dirs:
+        l += listFiles(dir)
+    return l
+
 
 def listFiles(dir):
-  '''Perform a depth first search of the specified
-  directory and return a list of all files found.'''
-  l = list()
-  basedir = dir
-  subdirlist = []
-  for item in os.listdir(dir):
-    if os.path.isfile(os.path.join(basedir,item)):
-      l.append(os.path.join(basedir, item))
-    else:
-      if item != '..' and  item != '.':
-        subdirlist.append(os.path.join(basedir, item))
-  for subdir in subdirlist:
-    l = l + listFiles(subdir)
-  return l
+    '''Perform a depth first search of the specified
+    directory and return a list of all files found.'''
+    l = list()
+    basedir = dir
+    subdirlist = []
+    for item in os.listdir(dir):
+        if os.path.isfile(os.path.join(basedir, item)):
+            l.append(os.path.join(basedir, item))
+        else:
+            if item != '..' and item != '.':
+                subdirlist.append(os.path.join(basedir, item))
+    for subdir in subdirlist:
+        l = l + listFiles(subdir)
+    return l
 
 
 def getHash(filename):
-  try:
-    img = Image.open(filename)
-    h = imagehash.phash(img)
-    img.close()
-    return ('phash', h)
-  except OSError:
-    # must not be an image, fall back to sha1
-    f = open(filename, 'rb')
-    h = hashlib.sha1(f.read()).digest()
-    f.close()
-    return ('sha1', h)
+    try:
+        img = Image.open(filename)
+        h = imagehash.phash(img)
+        img.close()
+        return ('phash', h)
+    except OSError:
+        # must not be an image, fall back to sha1
+        f = open(filename, 'rb')
+        h = hashlib.sha1(f.read()).digest()
+        f.close()
+        return ('sha1', h)
+
 
 def resolveDuplicate(left, right):
-  indexToKeep = resolvePicasa(left, right)
-  if indexToKeep > 0:
+    indexToKeep = resolvePicasa(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
+    indexToKeep = resolveDotFiles(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
+    indexToKeep = resolveInsensitiveMatch(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
+    indexToKeep = resolveFilenameCopies(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
+    indexToKeep = resolveWeirdFilenames(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
+    indexToKeep = resolveSameNameDifferentDirs(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
     return indexToKeep
-  indexToKeep = resolveDotFiles(left, right)
-  if indexToKeep > 0:
-    return indexToKeep
-  indexToKeep = resolveInsensitiveMatch(left, right)
-  if indexToKeep > 0:
-    return indexToKeep
-  indexToKeep = resolveFilenameCopies(left, right)
-  if indexToKeep > 0:
-    return indexToKeep
-  indexToKeep = resolveWeirdFilenames(left, right)
-  if indexToKeep > 0:
-    return indexToKeep
-  indexToKeep = resolveSameNameDifferentDirs(left, right)
-  if indexToKeep > 0:
-    return indexToKeep
-  return indexToKeep
+
 
 def resolvePicasa(left, right):
-  indexToKeep = 0
-  if re.search('.picasa', left, flags=re.IGNORECASE) is not None:
-    deleteFile(left)
-    indexToKeep = indexToKeep + 1
-  if re.search('.picasa', right, flags=re.IGNORECASE) is not None:
-    deleteFile(right)
-    indexToKeep = indexToKeep + 2
-  return indexToKeep
+    indexToKeep = 0
+    if re.search('.picasa', left, flags=re.IGNORECASE) is not None:
+        deleteFile(left)
+        indexToKeep = indexToKeep + 1
+    if re.search('.picasa', right, flags=re.IGNORECASE) is not None:
+        deleteFile(right)
+        indexToKeep = indexToKeep + 2
+    return indexToKeep
+
 
 def resolveDotFiles(left, right):
-  indexToKeep = 0
-  if os.path.basename(left)[0] == '.':
-    deleteFile(left)
-    indexToKeep = indexToKeep + 2
-  if os.path.basename(right)[0] == '.':
-    deleteFile(right)
-    indexToKeep = indexToKeep + 1
-  return indexToKeep
+    indexToKeep = 0
+    if os.path.basename(left)[0] == '.':
+        deleteFile(left)
+        indexToKeep = indexToKeep + 2
+    if os.path.basename(right)[0] == '.':
+        deleteFile(right)
+        indexToKeep = indexToKeep + 1
+    return indexToKeep
+
 
 def resolveInsensitiveMatch(left, right):
-  if left.lower() == right.lower():
-    deleteFile(left)
-    return 2
-  else:
-    return 0
+    if left.lower() == right.lower():
+        deleteFile(left)
+        return 2
+    else:
+        return 0
+
 
 def resolveFilenameCopies(left, right):
-  leftdir = os.path.dirname(left)
-  leftbase = os.path.basename(left)
-  (leftnoext, leftext) = os.path.splitext(leftbase)
-  rightdir = os.path.dirname(right)
-  rightbase = os.path.basename(right)
-  (rightnoext, rightext) = os.path.splitext(rightbase)
+    leftdir = os.path.dirname(left)
+    leftbase = os.path.basename(left)
+    (leftnoext, leftext) = os.path.splitext(leftbase)
+    rightdir = os.path.dirname(right)
+    rightbase = os.path.basename(right)
+    (rightnoext, rightext) = os.path.splitext(rightbase)
 
-  if leftdir != rightdir:
-    # only process within the same directory
-    return 0
-  if leftext.lower() != rightext.lower():
-    # only process within the same type
-    return 0
+    if leftdir != rightdir:
+        # only process within the same directory
+        return 0
+    if leftext.lower() != rightext.lower():
+        # only process within the same type
+        return 0
 
-  if re.search(leftnoext, rightnoext, flags=re.IGNORECASE):
-    # left is inside right, so kill right
-    deleteFile(right)
-    return 1
-  if re.search(rightnoext, leftnoext, flags=re.IGNORECASE):
-    # right is inside left, so kill left
-    deleteFile(left)
-    return 2
-
-  # couldn't resolve
-  leftMatch = re.search('[ _-]([0-9]{1,3})$', leftnoext)
-  rightMatch = re.search('[ _-]([0-9]{1,3})$', rightnoext)
-  if leftMatch is not None and rightMatch is None:
-    # check if we should delete left
-    if leftbase[:leftMatch.start()].lower() == rightbase.lower():
-      deleteFile(left)
-      return 2
-  elif leftMatch is None and rightMatch is not None:
-    # check if we should delete right
-    if leftbase.lower() == rightbase[:rightMatch.start()].lower():
-      deleteFile(right)
-      return 1
-  elif leftMatch is not None and rightMatch is not None:
-    lnum = int(leftMatch.group(1))
-    rnum = int(rightMatch.group(1))
-    if leftbase[:leftMatch.start()].lower() == rightbase[:rightMatch.start()].lower():
-      if lnum < rnum:
+    if re.search(leftnoext, rightnoext, flags=re.IGNORECASE):
+        # left is inside right, so kill right
         deleteFile(right)
         return 1
-      else:
+    if re.search(rightnoext, leftnoext, flags=re.IGNORECASE):
+        # right is inside left, so kill left
         deleteFile(left)
         return 2
-  return 0
+
+    # couldn't resolve
+    leftMatch = re.search('[ _-]([0-9]{1,3})$', leftnoext)
+    rightMatch = re.search('[ _-]([0-9]{1,3})$', rightnoext)
+    if leftMatch is not None and rightMatch is None:
+        # check if we should delete left
+        if leftbase[:leftMatch.start()].lower() == rightbase.lower():
+            deleteFile(left)
+            return 2
+    elif leftMatch is None and rightMatch is not None:
+        # check if we should delete right
+        if leftbase.lower() == rightbase[:rightMatch.start()].lower():
+            deleteFile(right)
+            return 1
+    elif leftMatch is not None and rightMatch is not None:
+        lnum = int(leftMatch.group(1))
+        rnum = int(rightMatch.group(1))
+        if leftbase[:leftMatch.start()].lower() == rightbase[:rightMatch.start()].lower():
+            if lnum < rnum:
+                deleteFile(right)
+                return 1
+            else:
+                deleteFile(left)
+                return 2
+    return 0
+
 
 def resolveWeirdFilenames(left, right):
-  leftweird = re.match('(dsc|img)[_-]?[0-9]+\.[a-z0-9]{3,4}', os.path.basename(left), flags=re.IGNORECASE) is None
-  rightweird = re.match('(dsc|img)[_-]?[0-9]+\.[a-z0-9]{3,4}', os.path.basename(right), flags=re.IGNORECASE) is None
-  if leftweird and not rightweird:
-    deleteFile(left)
-    return 2
-  elif not leftweird and rightweird:
-    deleteFile(right)
-    return 1
-  else:
-    return 0
-
-def resolveSameNameDifferentDirs(left, right):
-  leftdir = os.path.dirname(left)
-  leftbase = os.path.basename(left)
-  rightdir = os.path.dirname(right)
-  rightbase = os.path.basename(right)
-  if leftbase == rightbase and leftdir != rightdir:
-    leftMatch = re.search(os.path.sep + '([0-9]{4})-([0-9]{2})-([0-9]{2})' + os.path.sep, leftdir)
-    rightMatch = re.search(os.path.sep + '([0-9]{4})-([0-9]{2})-([0-9]{2})' + os.path.sep, rightdir)
-    if leftMatch is not None and rightMatch is not None:
-      leftymd = int(leftMatch.group(1) + leftMatch.group(2) + leftMatch.group(3))
-      rightymd = int(rightMatch.group(1) + rightMatch.group(2) + rightMatch.group(3))
-      if leftymd < rightymd:
-        deleteFile(right)
-        return 1
-      else:
+    leftweird = re.match(
+        '(dsc|img)[_-]?[0-9]+\.[a-z0-9]{3,4}', os.path.basename(left), flags=re.IGNORECASE) is None
+    rightweird = re.match(
+        '(dsc|img)[_-]?[0-9]+\.[a-z0-9]{3,4}', os.path.basename(right), flags=re.IGNORECASE) is None
+    if leftweird and not rightweird:
         deleteFile(left)
         return 2
-  return 0
+    elif not leftweird and rightweird:
+        deleteFile(right)
+        return 1
+    else:
+        return 0
+
+
+def resolveSameNameDifferentDirs(left, right):
+    leftdir = os.path.dirname(left)
+    leftbase = os.path.basename(left)
+    rightdir = os.path.dirname(right)
+    rightbase = os.path.basename(right)
+    if leftbase == rightbase and leftdir != rightdir:
+        leftMatch = re.search(
+            os.path.sep + '([0-9]{4})-([0-9]{2})-([0-9]{2})' + os.path.sep, leftdir)
+        rightMatch = re.search(
+            os.path.sep + '([0-9]{4})-([0-9]{2})-([0-9]{2})' + os.path.sep, rightdir)
+        if leftMatch is not None and rightMatch is not None:
+            leftymd = int(leftMatch.group(
+                1) + leftMatch.group(2) + leftMatch.group(3))
+            rightymd = int(rightMatch.group(
+                1) + rightMatch.group(2) + rightMatch.group(3))
+            if leftymd < rightymd:
+                deleteFile(right)
+                return 1
+            else:
+                deleteFile(left)
+                return 2
+    return 0
+
 
 def deleteFile(filename):
-  print("DELETE " + filename)
-  if DELETE:
-    try:
-      print("UNLINK " + filename)
-      os.unlink(filename)
-    except Exception as e:
-      print("ERROR can't unlink " + filename + ": " + str(e))
+    print("DELETE " + filename)
+    if DELETE:
+        try:
+            print("UNLINK " + filename)
+            os.unlink(filename)
+        except Exception as e:
+            print("ERROR can't unlink " + filename + ": " + str(e))
+
 
 ###############################################################################
 DELETE = False
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--delete',
-                      help='Delete duplicates', action='store_true')
-  parser.add_argument('dirnames', type=str, nargs='+',
-                      help='directories to process', action='store')
-  args = parser.parse_args()
-  DELETE = args.delete
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--delete',
+                        help='Delete duplicates', action='store_true')
+    parser.add_argument('dirnames', type=str, nargs='+',
+                        help='directories to process', action='store')
+    args = parser.parse_args()
+    DELETE = args.delete
 
-  SUPPORTED_EXTENSIONS = set(['qt', 'mov', 'mp4', 'mpg', 'mpeg', 'avi', 'wmv', 'wmf', 'jpg', 'jpeg', 'png', 'gif', 'tif', 'tiff'])
-  hashes = {}
-  allfiles = listFilesInMultipleDirs(args.dirnames)
-  for filename in allfiles:
-    dupe = False
-    h1 = getHash(filename)
-    if os.path.basename(filename)[0:2] == '._':
-      # skip HFS+ resource forks
-      print("SKIPPING " + filename)
-      continue
-    ext1 = os.path.splitext(filename)[1].lower()[1:]
-    if ext1 not in SUPPORTED_EXTENSIONS:
-      # skip things that aren't photos or videos
-      print("SKIPPING " + filename)
-      continue
-    if h1 in hashes:
-      filename2 = hashes[h1]
-      # FIXME: fold this into resolveDuplicate()
-      print("CHECKING " + filename2 + " and " + filename)
-      ext1 = os.path.splitext(filename)[1].lower()
-      ext2 = os.path.splitext(filename2)[1].lower()
-      if ext1 == ext2:
-        # only process if the types are the same
-        if h1[0] == 'sha1':
-          dupe = True
-        else:
-          img1 = Image.open(filename)
-          img2 = Image.open(filename2)
-          width1, height1 = img1.size
-          width2, height2 = img2.size
-          if width1 == width2 and height1 == height2:
-            dupe = True
-          img1.close()
-          img2.close()
-      else:
-        # no dupe
+    SUPPORTED_EXTENSIONS = set(['gif', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'wmf'])
+
+    hashes = {}
+    allfiles = listFilesInMultipleDirs(args.dirnames)
+    for filename in allfiles:
         dupe = False
+        h1 = getHash(filename)
+        if os.path.basename(filename)[0:2] == '._':
+            # skip HFS+ resource forks
+            print("SKIPPING " + filename)
+            continue
+        ext1 = os.path.splitext(filename)[1].lower()[1:]
+        if ext1 not in SUPPORTED_EXTENSIONS:
+            # skip things that aren't photos or videos
+            print("SKIPPING " + filename)
+            continue
+        if h1 in hashes:
+            filename2 = hashes[h1]
+            # FIXME: fold this into resolveDuplicate()
+            print("CHECKING " + filename2 + " and " + filename)
+            ext1 = os.path.splitext(filename)[1].lower()
+            ext2 = os.path.splitext(filename2)[1].lower()
+            if ext1 == ext2:
+                # only process if the types are the same
+                if h1[0] == 'sha1':
+                    dupe = True
+                else:
+                    img1 = Image.open(filename)
+                    img2 = Image.open(filename2)
+                    width1, height1 = img1.size
+                    width2, height2 = img2.size
+                    if width1 == width2 and height1 == height2:
+                        dupe = True
+                    img1.close()
+                    img2.close()
+            else:
+                # no dupe
+                dupe = False
 
-    # we have a real duplicate
-    if dupe:
-      print("DUPE " + hashes[h1] + " and " + filename)
-      indexToKeep = resolveDuplicate(filename, filename2)
-      if indexToKeep == 3:
-        # killed both
-        del hashes[h1]
-      elif indexToKeep == 1:
-        # keep left
-        hashes[h1] = filename
-      elif indexToKeep == 2:
-        # keep right
-        pass
-      else:
-        # did nothing
-        print("NO RESOLUTION " + filename + " " + filename2)
-    else:
-      hashes[h1] = filename
+        # we have a real duplicate
+        if dupe:
+            print("DUPE " + hashes[h1] + " and " + filename)
+            indexToKeep = resolveDuplicate(filename, filename2)
+            if indexToKeep == 3:
+                # killed both
+                del hashes[h1]
+            elif indexToKeep == 1:
+                # keep left
+                hashes[h1] = filename
+            elif indexToKeep == 2:
+                # keep right
+                pass
+            else:
+                # did nothing
+                print("NO RESOLUTION " + filename + " " + filename2)
+        else:
+            hashes[h1] = filename
