@@ -186,7 +186,7 @@ def makeDestDirYMD(destDirName, ymd):
 
 if __name__ == '__main__':
     if (len(sys.argv) != 3):
-        print('usage: photo-autorganize <source> <dir>')
+        print('usage: photo-autorganize <source> <dest>')
         sys.exit()
 
     sourceDirname = sys.argv[1]
