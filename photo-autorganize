@@ -108,7 +108,7 @@ def getDate(filename):
     if filename[filename.rindex(os.path.sep) + 1] == '.':
         return None
     extension = filename[filename.rindex('.') + 1:].lower()
-    if and (extension not in MOVIE_EXTENSIONS):
+    if (extension not in PHOTO_EXTENSIONS) and (extension not in MOVIE_EXTENSIONS):
         return None
 
     if extension in PHOTO_EXTENSIONS:
@@ -129,10 +129,11 @@ def getDate(filename):
             pass
     elif extension in MOVIE_EXTENSIONS:
         try:
-            metadata = hachoir.metadata.extractMetadata(
-                hachoir.parser.createParser(filename))
-            dt = metadata.get('creation_date')
-            return (dt.year, dt.month, dt.day)
+            metadata = hachoir.metadata.extractMetadata(hachoir.parser.createParser(filename))
+            if metadata is not None:
+                dt = metadata.get('creation_date')
+                if dt is not None:
+                    return (dt.year, dt.month, dt.day)
         except IOError:
             pass
         except OSError:
@@ -183,7 +184,6 @@ def makeDestDirYMD(destDirName, ymd):
 
 ########################################################
 
-
 if __name__ == '__main__':
     if (len(sys.argv) != 3):
         print('usage: photo-autorganize <source> <dir>')
@@ -213,7 +213,7 @@ if __name__ == '__main__':
             # good! stat failed
             try:
                 print('INFO: copying ' + filename + ' to ' + destFilename)
-                shutil.copy2(filename, destFilename)
+                #shutil.copy2(filename, destFilename)
             except OSError as detail:
                 print('ERROR: tried to copy ' + filename + ' to ' +
                       destFilename + ' but failed. ' + str(detail))
