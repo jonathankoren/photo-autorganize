@@ -71,7 +71,7 @@ def getHash(filename, hashmethod='phash'):
         img = Image.open(filename)
         h = hashfunc(img)
         img.close()
-        return ('phash', h)
+        return ('hash', h)
     except OSError:
         # must not be an image, fall back to sha1
         f = open(filename, 'rb')
@@ -291,7 +291,7 @@ if __name__ == '__main__':
             ext2 = os.path.splitext(filename2)[1].lower()
             if ext1 == ext2:
                 # only process if the types are the same
-                if h1[0] == 'phash':
+                if h1[0] == 'hash':
                     dupe = True
                 else:
                     img1 = Image.open(filename)
