@@ -53,10 +53,23 @@ def listFiles(dir):
     return l
 
 
-def getHash(filename):
+def getHash(filename, hashmethod='phash'):
+    # Inspiration to apply different hash methods taken from
+    # https://github.com/JohannesBuchner/imagehash/blob/master/find_similar_images.py
+    if hashmethod == 'ahash':
+        hashfunc = imagehash.average_hash
+    elif hashmethod == 'phash':
+        hashfunc = imagehash.phash
+    elif hashmethod == 'dhash':
+        hashfunc = imagehash.dhash
+    elif hashmethod == 'whash-haar':
+        hashfunc = imagehash.whash
+    elif hashmethod == 'whash-db4':
+        hashfunc = lambda img: imagehash.whash(img, mode='db4')
+
     try:
         img = Image.open(filename)
-        h = imagehash.phash(img)
+        h = hashfunc(img)
         img.close()
         return ('phash', h)
     except OSError:
@@ -226,6 +239,8 @@ def resolveSameNameDifferentDirs(left, right):
 
 
 def deleteFile(filename):
+    # This var could have any other name. Just tracks calls
+    deleteFile.call_counter += 1
     print("DELETE " + filename)
     if DELETE:
         try:
@@ -235,6 +250,8 @@ def deleteFile(filename):
             print("ERROR can't unlink " + filename + ": " + str(e))
 
 
+deleteFile.call_counter = 0
+
 ###############################################################################
 DELETE = False
 
@@ -242,6 +259,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--delete',
                         help='Delete duplicates', action='store_true')
+    parser.add_argument('--hashmethod', default='phash', nargs='?',
+                        choices=['ahash', 'phash', 'dhash', 'whash-haar', 'whash-db4'],
+                        help='hash method to apply to compare images')
     parser.add_argument('dirnames', type=str, nargs='+',
                         help='directories to process', action='store')
     args = parser.parse_args()
@@ -253,7 +273,7 @@ if __name__ == '__main__':
     allfiles = listFilesInMultipleDirs(args.dirnames)
     for filename in allfiles:
         dupe = False
-        h1 = getHash(filename)
+        h1 = getHash(filename, args.hashmethod)
         if os.path.basename(filename)[0:2] == '._':
             # skip HFS+ resource forks
             print("SKIPPING " + filename)
@@ -304,3 +324,5 @@ if __name__ == '__main__':
                 print("NO RESOLUTION " + filename + " " + filename2)
         else:
             hashes[h1] = filename
+
+    print(str(deleteFile.call_counter) + " FILES DELETED")
