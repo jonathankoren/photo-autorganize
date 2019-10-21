@@ -68,6 +68,9 @@ def getHash(filename):
 
 
 def resolveDuplicate(left, right):
+    indexToKeep = resolveDifferentSizes(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
     indexToKeep = resolvePicasa(left, right)
     if indexToKeep > 0:
         return indexToKeep
@@ -87,6 +90,20 @@ def resolveDuplicate(left, right):
     if indexToKeep > 0:
         return indexToKeep
     return indexToKeep
+
+
+def resolveDifferentSizes(left, right):
+    left_size = os.path.getsize(left)
+    right_size = os.path.getsize(right)
+
+    # Delete smaller file
+    if left_size < right_size:
+        deleteFile(left)
+        return 2
+    else:
+        deleteFile(right)
+        return 1
+    return 0
 
 
 def resolvePicasa(left, right):
@@ -254,7 +271,7 @@ if __name__ == '__main__':
             ext2 = os.path.splitext(filename2)[1].lower()
             if ext1 == ext2:
                 # only process if the types are the same
-                if h1[0] == 'sha1':
+                if h1[0] == 'phash':
                     dupe = True
                 else:
                     img1 = Image.open(filename)
