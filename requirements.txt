@@ -2,7 +2,7 @@ cffi==1.11.5
 hachoir==3.0a3
 ImageHash==4.0
 numpy==1.14.4
-Pillow==6.2.0
+Pillow==8.1.1
 pycparser==2.19
 pyexifinfo==0.4.0
 PyWavelets==0.5.2
