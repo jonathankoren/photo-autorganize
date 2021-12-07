@@ -121,11 +121,9 @@ def get_timestamp_from_photo_metadata(filename):
         for exiftag in ['DateTimeOriginal', 'DateTime']:
             dateTime = getExifTag(img, exiftag)
             if dateTime != None:
-                dts = dateTime[:dateTime.rindex(' ')].split(':')
+                dts = re.split('[^\d]', re.split(' |T', dateTime)[0])
                 return datetime.datetime(int(dts[0]), int(dts[1]), int(dts[2])).timestamp()
-    except IOError:
-        pass
-    except OSError:
+    except (IOError, OSError):
         pass
     return None
 
@@ -135,9 +133,7 @@ def get_timestamp_from_movie_metadata(filename):
         metadata = hachoir.metadata.extractMetadata(hachoir.parser.createParser(filename))
         if metadata is not None:
             return metadata.get('creation_date').timestamp()
-    except IOError:
-        pass
-    except OSError:
+    except (IOError, ValueError, OSError):
         pass
     return None
 
@@ -263,7 +259,8 @@ if __name__ == '__main__':
             logging.info('skipping ' + filename)
             continue
         destDirnameYMD = makeDestDirYMD(destDirName, ymd)
-        destFilename = destDirnameYMD + os.path.sep + os.path.basename(filename).lower()
+        destFilename = destDirnameYMD + os.path.sep + \
+            os.path.basename(filename).lower()
         try:
             os.makedirs(destDirnameYMD)
         except OSError:
@@ -280,4 +277,5 @@ if __name__ == '__main__':
                 logging.info('copying ' + filename + ' to ' + destFilename)
                 shutil.copy2(filename, destFilename)
             except OSError as detail:
-                logging.error('tried to copy ' + filename + ' to ' + destFilename + ' but failed. ' + str(detail))
+                logging.error('tried to copy ' + filename + ' to ' +
+                      destFilename + ' but failed. ' + str(detail))
