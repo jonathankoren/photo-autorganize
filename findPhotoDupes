@@ -53,12 +53,25 @@ def listFiles(dir):
     return l
 
 
-def getHash(filename):
+def getHash(filename, hashmethod='phash'):
+    # Inspiration to apply different hash methods taken from
+    # https://github.com/JohannesBuchner/imagehash/blob/master/find_similar_images.py
+    if hashmethod == 'ahash':
+        hashfunc = imagehash.average_hash
+    elif hashmethod == 'phash':
+        hashfunc = imagehash.phash
+    elif hashmethod == 'dhash':
+        hashfunc = imagehash.dhash
+    elif hashmethod == 'whash-haar':
+        hashfunc = imagehash.whash
+    elif hashmethod == 'whash-db4':
+        hashfunc = lambda img: imagehash.whash(img, mode='db4')
+
     try:
         img = Image.open(filename)
-        h = imagehash.phash(img)
+        h = hashfunc(img)
         img.close()
-        return ('phash', h)
+        return ('hash', h)
     except OSError:
         # must not be an image, fall back to sha1
         f = open(filename, 'rb')
@@ -68,6 +81,9 @@ def getHash(filename):
 
 
 def resolveDuplicate(left, right):
+    indexToKeep = resolveDifferentSizes(left, right)
+    if indexToKeep > 0:
+        return indexToKeep
     indexToKeep = resolvePicasa(left, right)
     if indexToKeep > 0:
         return indexToKeep
@@ -87,6 +103,20 @@ def resolveDuplicate(left, right):
     if indexToKeep > 0:
         return indexToKeep
     return indexToKeep
+
+
+def resolveDifferentSizes(left, right):
+    left_size = os.path.getsize(left)
+    right_size = os.path.getsize(right)
+
+    # Delete smaller file
+    if left_size < right_size:
+        deleteFile(left)
+        return 2
+    else:
+        deleteFile(right)
+        return 1
+    return 0
 
 
 def resolvePicasa(left, right):
@@ -209,6 +239,8 @@ def resolveSameNameDifferentDirs(left, right):
 
 
 def deleteFile(filename):
+    # This var could have any other name. Just tracks calls
+    deleteFile.call_counter += 1
     print("DELETE " + filename)
     if DELETE:
         try:
@@ -218,6 +250,8 @@ def deleteFile(filename):
             print("ERROR can't unlink " + filename + ": " + str(e))
 
 
+deleteFile.call_counter = 0
+
 ###############################################################################
 DELETE = False
 
@@ -225,6 +259,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--delete',
                         help='Delete duplicates', action='store_true')
+    parser.add_argument('--hashmethod', default='phash', nargs='?',
+                        choices=['ahash', 'phash', 'dhash', 'whash-haar', 'whash-db4'],
+                        help='hash method to apply to compare images')
     parser.add_argument('dirnames', type=str, nargs='+',
                         help='directories to process', action='store')
     args = parser.parse_args()
@@ -236,7 +273,7 @@ if __name__ == '__main__':
     allfiles = listFilesInMultipleDirs(args.dirnames)
     for filename in allfiles:
         dupe = False
-        h1 = getHash(filename)
+        h1 = getHash(filename, args.hashmethod)
         if os.path.basename(filename)[0:2] == '._':
             # skip HFS+ resource forks
             print("SKIPPING " + filename)
@@ -254,7 +291,7 @@ if __name__ == '__main__':
             ext2 = os.path.splitext(filename2)[1].lower()
             if ext1 == ext2:
                 # only process if the types are the same
-                if h1[0] == 'sha1':
+                if h1[0] == 'hash':
                     dupe = True
                 else:
                     img1 = Image.open(filename)
@@ -287,3 +324,5 @@ if __name__ == '__main__':
                 print("NO RESOLUTION " + filename + " " + filename2)
         else:
             hashes[h1] = filename
+
+    print(str(deleteFile.call_counter) + " FILES DELETED")
